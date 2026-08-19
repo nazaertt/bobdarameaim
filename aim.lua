@@ -1,4 +1,4 @@
--- Mobile (iOS / Delta) bobdar (FIXED v2.45 - UI & DownTime)
+-- Mobile (iOS / Delta) bobdar (FIXED v2.46 - Smooth Aim Slider)
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local Stats = game:GetService("Stats")
@@ -12,6 +12,8 @@ local Settings = {
     ItemESP = true,
     FOV = true,
     Aim = false,
+    SmoothAim = true,      -- Включение сглаживания
+    Smoothness = 5,        -- Сила тяжести/плавности (от 1 до 10)
     NoRecoil = true,        
     SpeedHack = false,      
     WalkSpeed = 24,         
@@ -74,9 +76,9 @@ SelectorLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
 SelTitle.LayoutOrder = 0
 
 local menuSizes = {
-    Phone = {mainSize = UDim2.new(0, 180, 0, 450), btnSize = UDim2.new(0, 45, 0, 45)},
-    PC = {mainSize = UDim2.new(0, 220, 0, 450), btnSize = UDim2.new(0, 56, 0, 56)},
-    Tablet = {mainSize = UDim2.new(0, 280, 0, 510), btnSize = UDim2.new(0, 70, 0, 70)}
+    Phone = {mainSize = UDim2.new(0, 180, 0, 500), btnSize = UDim2.new(0, 45, 0, 45)},
+    PC = {mainSize = UDim2.new(0, 220, 0, 500), btnSize = UDim2.new(0, 56, 0, 56)},
+    Tablet = {mainSize = UDim2.new(0, 280, 0, 560), btnSize = UDim2.new(0, 70, 0, 70)}
 }
 
 local selectedConfig = menuSizes.PC
@@ -211,7 +213,7 @@ function StartMainHub()
     TitleLabel.Parent = MainFrame
     TitleLabel.Size = UDim2.new(1, 0, 0, 30)
     TitleLabel.BackgroundTransparency = 1
-    TitleLabel.Text = "bobdar (FIXED)"
+    TitleLabel.Text = "bobdar (SMOOTH)"
     TitleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
     TitleLabel.Font = MinecraftFont
     TitleLabel.TextSize = 13
@@ -230,7 +232,7 @@ function StartMainHub()
         MainFrame.Visible = not MainFrame.Visible
     end)
 
-    -- **ФИКС РАСПОЛОЖЕНИЯ КНОПОК (UIListLayout внутри MainFrame)**
+    -- **Контейнер элементов меню**
     local Container = Instance.new("UIListLayout")
     Container.Parent = MainFrame
     Container.SortOrder = Enum.SortOrder.LayoutOrder
@@ -355,7 +357,87 @@ function StartMainHub()
         end
     end)
 
-    -- **6. ПРЫЖКИ**
+    -- **6. SMOOTHNESS SLIDER (Полоска для настройки плавности/тяжести)**
+    local SmoothFrame = Instance.new("Frame")
+    SmoothFrame.Name = "SmoothFrame"
+    SmoothFrame.Parent = MainFrame
+    SmoothFrame.Size = UDim2.new(0.9, 0, 0, 42)
+    SmoothFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+    SmoothFrame.LayoutOrder = itemOrder
+    itemOrder = itemOrder + 1
+
+    local SmoothCorner = Instance.new("UICorner")
+    SmoothCorner.CornerRadius = UDim.new(0, 6)
+    SmoothCorner.Parent = SmoothFrame
+
+    local SmoothLabel = Instance.new("TextLabel")
+    SmoothLabel.Parent = SmoothFrame
+    SmoothLabel.Size = UDim2.new(1, 0, 0, 20)
+    SmoothLabel.BackgroundTransparency = 1
+    SmoothLabel.Text = "Smooth (Weight): " .. Settings.Smoothness
+    SmoothLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+    SmoothLabel.Font = MinecraftFont
+    SmoothLabel.TextSize = 11
+
+    -- Сама визуальная полоска с прогрессом
+    local BarBg = Instance.new("Frame")
+    BarBg.Parent = SmoothFrame
+    BarBg.Size = UDim2.new(0.8, 0, 0, 6)
+    BarBg.Position = UDim2.new(0.1, 0, 0, 26)
+    BarBg.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+    local BarBgCorner = Instance.new("UICorner")
+    BarBgCorner.CornerRadius = UDim.new(1, 0)
+    BarBgCorner.Parent = BarBg
+
+    local BarFill = Instance.new("Frame")
+    BarFill.Parent = BarBg
+    BarFill.Size = UDim2.new(Settings.Smoothness / 10, 0, 1, 0)
+    BarFill.BackgroundColor3 = Color3.fromRGB(0, 255, 150)
+    local BarFillCorner = Instance.new("UICorner")
+    BarFillCorner.CornerRadius = UDim.new(1, 0)
+    BarFillCorner.Parent = BarFill
+
+    -- Кнопки изменения настройки плавности
+    local SmoothMinus = Instance.new("TextButton")
+    SmoothMinus.Parent = SmoothFrame
+    SmoothMinus.Size = UDim2.new(0, 25, 0, 20)
+    SmoothMinus.Position = UDim2.new(0, 2, 0, 20)
+    SmoothMinus.BackgroundTransparency = 1
+    SmoothMinus.Text = "<"
+    SmoothMinus.TextColor3 = Color3.fromRGB(255, 100, 100)
+    SmoothMinus.Font = MinecraftFont
+    SmoothMinus.TextSize = 14
+
+    local SmoothPlus = Instance.new("TextButton")
+    SmoothPlus.Parent = SmoothFrame
+    SmoothPlus.Size = UDim2.new(0, 25, 0, 20)
+    SmoothPlus.Position = UDim2.new(1, -27, 0, 20)
+    SmoothPlus.BackgroundTransparency = 1
+    SmoothPlus.Text = ">"
+    SmoothPlus.TextColor3 = Color3.fromRGB(100, 255, 100)
+    SmoothPlus.Font = MinecraftFont
+    SmoothPlus.TextSize = 14
+
+    local function UpdateSmoothDisplay()
+        SmoothLabel.Text = "Smooth (Weight): " .. Settings.Smoothness
+        BarFill.Size = UDim2.new(Settings.Smoothness / 10, 0, 1, 0)
+    end
+
+    SmoothMinus.MouseButton1Click:Connect(function()
+        if Settings.Smoothness > 1 then
+            Settings.Smoothness = Settings.Smoothness - 1
+            UpdateSmoothDisplay()
+        end
+    end)
+
+    SmoothPlus.MouseButton1Click:Connect(function()
+        if Settings.Smoothness < 10 then
+            Settings.Smoothness = Settings.Smoothness + 1
+            UpdateSmoothDisplay()
+        end
+    end)
+
+    -- **7. ПРЫЖКИ**
     UserInputService.JumpRequest:Connect(function()
         local char = LocalPlayer.Character
         if not char then return end
@@ -372,7 +454,7 @@ function StartMainHub()
         end
     end)
 
-    -- **7. Кнопки меню**
+    -- **8. Кнопки меню**
     CreateToggleButton("ESPBtn", "Wallhack ESP", Settings.ESP, function()
         Settings.ESP = not Settings.ESP
         return Settings.ESP
@@ -392,6 +474,11 @@ function StartMainHub()
     CreateToggleButton("AimBtn", "Auto Aim", Settings.Aim, function()
         Settings.Aim = not Settings.Aim
         return Settings.Aim
+    end)
+
+    CreateToggleButton("SmoothAimBtn", "Smooth Aim", Settings.SmoothAim, function()
+        Settings.SmoothAim = not Settings.SmoothAim
+        return Settings.SmoothAim
     end)
 
     CreateToggleButton("RecoilBtn", "No Recoil", Settings.NoRecoil, function()
@@ -439,12 +526,12 @@ function StartMainHub()
         UpdateJumpModeAppearance()
     end)
 
-    -- **8. ФУНКЦИЯ down time (ПУСТАЯ)**
+    -- **9. ФУНКЦИЯ down time (ПУСТАЯ)**
     local function down_time()
         -- Содержимое удалено, функция отключена
     end
 
-    -- **9. ESP Игроков**
+    -- **10. ESP Игроков**
     local function GetEquippedItem(character)
         if not character then return "None" end
         local tool = character:FindFirstChildOfClass("Tool")
@@ -510,7 +597,7 @@ function StartMainHub()
     for _, player in pairs(Players:GetPlayers()) do ApplyESP(player) end
     Players.PlayerAdded:Connect(ApplyESP)
 
-    -- **10. Auto Aim & Speed**
+    -- **11. Auto Aim с плавным сглаживанием (Smooth Aim)**
     local function GetClosestTarget()
         local NearestTarget = nil
         local ShortestDistance = Settings.FOVRadius
@@ -539,7 +626,14 @@ function StartMainHub()
         if Settings.Aim then
             local target = GetClosestTarget()
             if target then
-                Camera.CFrame = CFrame.new(Camera.CFrame.Position, target.Position)
+                local targetCFrame = CFrame.new(Camera.CFrame.Position, target.Position)
+                if Settings.SmoothAim then
+                    -- Формула инерции и тяжести: чем выше Smoothness, тем медленнее и плавне доводка
+                    local smoothnessFactor = math.clamp(Settings.Smoothness * 1.5, 1, 20)
+                    Camera.CFrame = Camera.CFrame:Lerp(targetCFrame, 1 / smoothnessFactor)
+                else
+                    Camera.CFrame = targetCFrame
+                end
             end
         end
         
@@ -552,7 +646,7 @@ function StartMainHub()
         end
     end)
 
-    -- **11. No Recoil**
+    -- **12. No Recoil**
     RunService.Heartbeat:Connect(function()
         if Settings.NoRecoil then
             local char = LocalPlayer.Character
