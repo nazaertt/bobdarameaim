@@ -1,4 +1,4 @@
--- Mobile (iOS / Delta) bobdar (FIXED v2.47 - New Players ESP Fix)
+-- Mobile (iOS / Delta) bobdar (FIXED v2.48 - New Player Text ESP Fix)
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local Stats = game:GetService("Stats")
@@ -213,7 +213,7 @@ function StartMainHub()
     TitleLabel.Parent = MainFrame
     TitleLabel.Size = UDim2.new(1, 0, 0, 30)
     TitleLabel.BackgroundTransparency = 1
-    TitleLabel.Text = "bobdar (FIXED ESP)"
+    TitleLabel.Text = "bobdar (FIXED)"
     TitleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
     TitleLabel.Font = MinecraftFont
     TitleLabel.TextSize = 13
@@ -529,7 +529,7 @@ function StartMainHub()
         -- Содержимое удалено, функция отключена
     end
 
-    -- **10. ФИКС ESP ИГРОКОВ (Автоматическое отслеживание новых игроков)**
+    -- **10. НАДЕЖНЫЙ ESP ИГРОКОВ (Фикс появления текста HP и оружия)**
     local function GetEquippedItem(character)
         if not character then return "None" end
         local tool = character:FindFirstChildOfClass("Tool")
@@ -539,50 +539,52 @@ function StartMainHub()
     local function SetupCharacter(player, character)
         if not character then return end
         
-        -- Ждем появления головы и гуманоида (если игрок только зашел)
-        local head = character:WaitForChild("Head", 5)
-        local humanoid = character:WaitForChild("Humanoid", 5)
-        if not head or not humanoid then return end
-
-        -- Удаляем старую подсветку, если она осталась
-        if character:FindFirstChild("iOS_Highlight") then
-            character.iOS_Highlight:Destroy()
-        end
-        if head:FindFirstChild("iOS_ItemESP") then
-            head.iOS_ItemESP:Destroy()
-        end
-
-        -- Создаем Wallhack (Highlight)
-        local highlight = Instance.new("Highlight")
-        highlight.Name = "iOS_Highlight"
-        highlight.Parent = character
-        highlight.Adornee = character
-        highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-        highlight.FillColor = Settings.ESPColor
-        highlight.FillTransparency = 0.6
-        highlight.Enabled = Settings.ESP
-
-        -- Создаем текст (Имя, Оружие, HP) над головой
-        local billboard = Instance.new("BillboardGui")
-        billboard.Name = "iOS_ItemESP"
-        billboard.Parent = head
-        billboard.Adornee = head
-        billboard.Size = UDim2.new(0, 200, 0, 50)
-        billboard.StudsOffset = Vector3.new(0, 2.5, 0)
-        billboard.AlwaysOnTop = true
-
-        local textLabel = Instance.new("TextLabel")
-        textLabel.Name = "ESPText"
-        textLabel.Parent = billboard
-        textLabel.Size = UDim2.new(1, 0, 1, 0)
-        textLabel.BackgroundTransparency = 1
-        textLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-        textLabel.TextStrokeTransparency = 0
-        textLabel.Font = MinecraftFont
-        textLabel.TextSize = 11
-
+        -- Используем бесконечный цикл ожидания в отдельном потоке, чтобы точно дождаться прогрузки головы
         task.spawn(function()
-            while character and character.Parent and humanoid.Health > 0 do
+            local head = character:WaitForChild("Head", 10)
+            local humanoid = character:WaitForChild("Humanoid", 10)
+            
+            if not head or not humanoid then return end
+
+            -- Удаляем старые элементы, если они дублировались
+            if character:FindFirstChild("iOS_Highlight") then
+                character.iOS_Highlight:Destroy()
+            end
+            if head:FindFirstChild("iOS_ItemESP") then
+                head.iOS_ItemESP:Destroy()
+            end
+
+            -- Создаем подсветку (Wallhack)
+            local highlight = Instance.new("Highlight")
+            highlight.Name = "iOS_Highlight"
+            highlight.Parent = character
+            highlight.Adornee = character
+            highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+            highlight.FillColor = Settings.ESPColor
+            highlight.FillTransparency = 0.6
+            highlight.Enabled = Settings.ESP
+
+            -- Создаем текстовый блок над головой (HP, Имя, Оружие)
+            local billboard = Instance.new("BillboardGui")
+            billboard.Name = "iOS_ItemESP"
+            billboard.Parent = head
+            billboard.Adornee = head
+            billboard.Size = UDim2.new(0, 200, 0, 50)
+            billboard.StudsOffset = Vector3.new(0, 2.5, 0)
+            billboard.AlwaysOnTop = true
+
+            local textLabel = Instance.new("TextLabel")
+            textLabel.Name = "ESPText"
+            textLabel.Parent = billboard
+            textLabel.Size = UDim2.new(1, 0, 1, 0)
+            textLabel.BackgroundTransparency = 1
+            textLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+            textLabel.TextStrokeTransparency = 0
+            textLabel.Font = MinecraftFont
+            textLabel.TextSize = 11
+
+            -- Цикл обновления информации в реальном времени
+            while character and character.Parent and humanoid and humanoid.Health > 0 do
                 highlight.Enabled = Settings.ESP
                 billboard.Enabled = Settings.ESP or Settings.ItemESP
 
@@ -592,6 +594,7 @@ function StartMainHub()
                 textLabel.Text = string.format("%s\n%s\n%s", player.Name, itemText, hpText)
                 task.wait(0.3)
             end
+            
             if billboard then billboard:Destroy() end
             if highlight then highlight:Destroy() end
         end)
@@ -600,27 +603,23 @@ function StartMainHub()
     local function ApplyESPToPlayer(player)
         if player == LocalPlayer then return end
 
-        -- Если у игрока уже есть персонаж
+        -- Если персонаж уже есть при подключении
         if player.Character then
-            task.spawn(function()
-                SetupCharacter(player, player.Character)
-            end)
+            SetupCharacter(player, player.Character)
         end
 
-        -- Следим за его новыми респаунами (возрождениями)
+        -- Отслеживаем новые респауны
         player.CharacterAdded:Connect(function(newChar)
-            task.spawn(function()
-                SetupCharacter(player, newChar)
-            end)
+            SetupCharacter(player, newChar)
         end)
     end
 
-    -- Подключаем всех текущих игроков
+    -- Подключаем всех текущих игроков на сервере
     for _, player in pairs(Players:GetPlayers()) do
         ApplyESPToPlayer(player)
     end
 
-    -- Важно: автоматический перехват при подключении НОВЫХ игроков на сервер
+    -- Подключаем новых игроков, заходящих на сервер
     Players.PlayerAdded:Connect(function(newPlayer)
         ApplyESPToPlayer(newPlayer)
     end)
