@@ -1,4 +1,4 @@
--- Mobile (iOS / Delta) bobdar (FIXED v2.46 - Smooth Aim Slider)
+-- Mobile (iOS / Delta) bobdar (FIXED v2.47 - New Players ESP Fix)
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local Stats = game:GetService("Stats")
@@ -12,8 +12,8 @@ local Settings = {
     ItemESP = true,
     FOV = true,
     Aim = false,
-    SmoothAim = true,      -- Включение сглаживания
-    Smoothness = 5,        -- Сила тяжести/плавности (от 1 до 10)
+    SmoothAim = true,      
+    Smoothness = 5,        
     NoRecoil = true,        
     SpeedHack = false,      
     WalkSpeed = 24,         
@@ -213,7 +213,7 @@ function StartMainHub()
     TitleLabel.Parent = MainFrame
     TitleLabel.Size = UDim2.new(1, 0, 0, 30)
     TitleLabel.BackgroundTransparency = 1
-    TitleLabel.Text = "bobdar (SMOOTH)"
+    TitleLabel.Text = "bobdar (FIXED ESP)"
     TitleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
     TitleLabel.Font = MinecraftFont
     TitleLabel.TextSize = 13
@@ -357,7 +357,7 @@ function StartMainHub()
         end
     end)
 
-    -- **6. SMOOTHNESS SLIDER (Полоска для настройки плавности/тяжести)**
+    -- **6. SMOOTHNESS SLIDER**
     local SmoothFrame = Instance.new("Frame")
     SmoothFrame.Name = "SmoothFrame"
     SmoothFrame.Parent = MainFrame
@@ -379,7 +379,6 @@ function StartMainHub()
     SmoothLabel.Font = MinecraftFont
     SmoothLabel.TextSize = 11
 
-    -- Сама визуальная полоска с прогрессом
     local BarBg = Instance.new("Frame")
     BarBg.Parent = SmoothFrame
     BarBg.Size = UDim2.new(0.8, 0, 0, 6)
@@ -397,7 +396,6 @@ function StartMainHub()
     BarFillCorner.CornerRadius = UDim.new(1, 0)
     BarFillCorner.Parent = BarFill
 
-    -- Кнопки изменения настройки плавности
     local SmoothMinus = Instance.new("TextButton")
     SmoothMinus.Parent = SmoothFrame
     SmoothMinus.Size = UDim2.new(0, 25, 0, 20)
@@ -531,73 +529,103 @@ function StartMainHub()
         -- Содержимое удалено, функция отключена
     end
 
-    -- **10. ESP Игроков**
+    -- **10. ФИКС ESP ИГРОКОВ (Автоматическое отслеживание новых игроков)**
     local function GetEquippedItem(character)
         if not character then return "None" end
         local tool = character:FindFirstChildOfClass("Tool")
         return tool and tool.Name or "Fists"
     end
 
-    local function ApplyESP(player)
+    local function SetupCharacter(player, character)
+        if not character then return end
+        
+        -- Ждем появления головы и гуманоида (если игрок только зашел)
+        local head = character:WaitForChild("Head", 5)
+        local humanoid = character:WaitForChild("Humanoid", 5)
+        if not head or not humanoid then return end
+
+        -- Удаляем старую подсветку, если она осталась
+        if character:FindFirstChild("iOS_Highlight") then
+            character.iOS_Highlight:Destroy()
+        end
+        if head:FindFirstChild("iOS_ItemESP") then
+            head.iOS_ItemESP:Destroy()
+        end
+
+        -- Создаем Wallhack (Highlight)
+        local highlight = Instance.new("Highlight")
+        highlight.Name = "iOS_Highlight"
+        highlight.Parent = character
+        highlight.Adornee = character
+        highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+        highlight.FillColor = Settings.ESPColor
+        highlight.FillTransparency = 0.6
+        highlight.Enabled = Settings.ESP
+
+        -- Создаем текст (Имя, Оружие, HP) над головой
+        local billboard = Instance.new("BillboardGui")
+        billboard.Name = "iOS_ItemESP"
+        billboard.Parent = head
+        billboard.Adornee = head
+        billboard.Size = UDim2.new(0, 200, 0, 50)
+        billboard.StudsOffset = Vector3.new(0, 2.5, 0)
+        billboard.AlwaysOnTop = true
+
+        local textLabel = Instance.new("TextLabel")
+        textLabel.Name = "ESPText"
+        textLabel.Parent = billboard
+        textLabel.Size = UDim2.new(1, 0, 1, 0)
+        textLabel.BackgroundTransparency = 1
+        textLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+        textLabel.TextStrokeTransparency = 0
+        textLabel.Font = MinecraftFont
+        textLabel.TextSize = 11
+
+        task.spawn(function()
+            while character and character.Parent and humanoid.Health > 0 do
+                highlight.Enabled = Settings.ESP
+                billboard.Enabled = Settings.ESP or Settings.ItemESP
+
+                local itemText = Settings.ItemESP and ("[ " .. GetEquippedItem(character) .. " ]") or ""
+                local hpText = string.format("HP: %d/%d", math.floor(humanoid.Health), math.floor(humanoid.MaxHealth))
+                
+                textLabel.Text = string.format("%s\n%s\n%s", player.Name, itemText, hpText)
+                task.wait(0.3)
+            end
+            if billboard then billboard:Destroy() end
+            if highlight then highlight:Destroy() end
+        end)
+    end
+
+    local function ApplyESPToPlayer(player)
         if player == LocalPlayer then return end
 
-        local function SetupCharacter(character)
-            if not character then return end
-            local head = character:WaitForChild("Head", 4)
-            local humanoid = character:WaitForChild("Humanoid", 4)
-            if not head or not humanoid then return end
-
-            local highlight = character:FindFirstChild("iOS_Highlight") or Instance.new("Highlight")
-            highlight.Name = "iOS_Highlight"
-            highlight.Parent = character
-            highlight.Adornee = character
-            highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-            highlight.FillColor = Settings.ESPColor
-            highlight.FillTransparency = 0.6
-            highlight.Enabled = Settings.ESP
-
-            local billboard = head:FindFirstChild("iOS_ItemESP") or Instance.new("BillboardGui")
-            billboard.Name = "iOS_ItemESP"
-            billboard.Parent = head
-            billboard.Adornee = head
-            billboard.Size = UDim2.new(0, 200, 0, 50)
-            billboard.StudsOffset = Vector3.new(0, 2.5, 0)
-            billboard.AlwaysOnTop = true
-
-            local textLabel = billboard:FindFirstChild("ESPText") or Instance.new("TextLabel")
-            textLabel.Name = "ESPText"
-            textLabel.Parent = billboard
-            textLabel.Size = UDim2.new(1, 0, 1, 0)
-            textLabel.BackgroundTransparency = 1
-            textLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-            textLabel.TextStrokeTransparency = 0
-            textLabel.Font = MinecraftFont
-            textLabel.TextSize = 11
-
+        -- Если у игрока уже есть персонаж
+        if player.Character then
             task.spawn(function()
-                while character and character.Parent and humanoid.Health > 0 do
-                    highlight.Enabled = Settings.ESP
-                    billboard.Enabled = Settings.ESP or Settings.ItemESP
-
-                    local itemText = Settings.ItemESP and ("[ " .. GetEquippedItem(character) .. " ]") or ""
-                    local hpText = string.format("HP: %d/%d", math.floor(humanoid.Health), math.floor(humanoid.MaxHealth))
-                    
-                    textLabel.Text = string.format("%s\n%s\n%s", player.Name, itemText, hpText)
-                    task.wait(0.3)
-                end
-                if billboard then billboard:Destroy() end
-                if highlight then highlight:Destroy() end
+                SetupCharacter(player, player.Character)
             end)
         end
 
-        if player.Character then SetupCharacter(player.Character) end
-        player.CharacterAdded:Connect(SetupCharacter)
+        -- Следим за его новыми респаунами (возрождениями)
+        player.CharacterAdded:Connect(function(newChar)
+            task.spawn(function()
+                SetupCharacter(player, newChar)
+            end)
+        end)
     end
 
-    for _, player in pairs(Players:GetPlayers()) do ApplyESP(player) end
-    Players.PlayerAdded:Connect(ApplyESP)
+    -- Подключаем всех текущих игроков
+    for _, player in pairs(Players:GetPlayers()) do
+        ApplyESPToPlayer(player)
+    end
 
-    -- **11. Auto Aim с плавным сглаживанием (Smooth Aim)**
+    -- Важно: автоматический перехват при подключении НОВЫХ игроков на сервер
+    Players.PlayerAdded:Connect(function(newPlayer)
+        ApplyESPToPlayer(newPlayer)
+    end)
+
+    -- **11. Auto Aim с плавным сглаживанием**
     local function GetClosestTarget()
         local NearestTarget = nil
         local ShortestDistance = Settings.FOVRadius
@@ -628,7 +656,6 @@ function StartMainHub()
             if target then
                 local targetCFrame = CFrame.new(Camera.CFrame.Position, target.Position)
                 if Settings.SmoothAim then
-                    -- Формула инерции и тяжести: чем выше Smoothness, тем медленнее и плавне доводка
                     local smoothnessFactor = math.clamp(Settings.Smoothness * 1.5, 1, 20)
                     Camera.CFrame = Camera.CFrame:Lerp(targetCFrame, 1 / smoothnessFactor)
                 else
